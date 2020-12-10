@@ -43,7 +43,47 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install npm package(s)
-        run: npm install ${{ matrix.node-package }}
+        run: npm install --no-save --ignore-scripts ${{ matrix.node-package }}
+      - # Expecting: build ok
+        # Actual behavior: build ok
+        name: Build container(s) in docker-compose.works.yml
+        run: docker-compose -f docker-compose.works.yml build
+      - # Expecting: 'invalid reference format: repository name must be lowercase'
+        # Actual behavior:
+        #  'Couldn't connect to Docker daemon at http+docker://localhost - is it running?'
+        #  OR
+        #  'invalid reference format: repository name must be lowercase'
+        name: Build container(s) in docker-compose.fails.yml
+        #run: docker-compose -f docker-compose.fails.yml build
+        run: |
+          output=$(docker-compose -f docker-compose.fails.yml build 2>&1 || true)
+          echo "${output}"
+          if ! grep -q 'invalid reference format: repository name must be lowercase' <<< "${output}"; then
+            exit 1
+          fi
+      - # Expecting: build ok
+        # Actual behavior: build ok
+        name: Build container(s) in docker-compose.works.yml
+        run: docker-compose -f docker-compose.works.yml build
+  with-node-workaround:
+    runs-on: ${{ matrix.virtual-environment }}
+    strategy:
+      fail-fast: false
+      matrix:
+        virtual-environment: [ubuntu-20.04, ubuntu-18.04, ubuntu-16.04]
+        node-version: [10, 12, 14]
+        node-package: [lodash, tslib, request, debug, prop-types]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install node
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install npm package(s)
+        run: npm install --no-save --ignore-scripts ${{ matrix.node-package }}
+      - name: (workaround) Delete all *.js files
+        run: find node_modules -type f -name *.js -delete
       - # Expecting: build ok
         # Actual behavior: build ok
         name: Build container(s) in docker-compose.works.yml
